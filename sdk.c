@@ -10,6 +10,7 @@
 #define NUMOFSLACK 50
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
+#define CONVERSE 2097152
 int main()
 {
     init_platform();
@@ -24,8 +25,6 @@ int main()
 		}
 	}
 	
-	if(baza.is_open())
-    {
         for(int j = 0; j < ROWSIZE; j++)
         {
             for(int i = 0; i< NUMOFVAR; i++)
@@ -40,7 +39,6 @@ int main()
 			wv[j][COLSIZE-1]=ulazhex[indeks];
 			indeks++;
 		}
-    }
 	for(int j=0;j<ROWSIZE; j++)
 	{
 		for(int i =0;i<COLSIZE;i++)
@@ -142,7 +140,7 @@ int main()
            //offset += sc_core::sc_time(1*takt, sc_core::SC_NS);///koliko taktova
            //std::cout<<(int)p<<std::endl;
           //write_bram(p++, (num_t) wv[pivotRow][j]);//write into bram 
-		  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) wv[pivotRow][j]);
+		  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (wv[pivotRow][j]*CONVERSE));
 		  p++;
   }
   for (int i = 0; i < ROWSIZE; ++i)
@@ -154,7 +152,7 @@ int main()
            //offset += sc_core::sc_time(1*takt, sc_core::SC_NS);///koliko taktova
            //std::cout<<(int)p<<std::endl;
           //write_bram(p++, (num_t) wv[i][j]);//write into bram
-		  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) wv[i][j]);
+		  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (wv[i][j]*CONVERSE));
 		  p++;
           
 	}
@@ -165,7 +163,7 @@ int main()
   //write_bram(p++,pivotRow);
   //offset += sc_core::sc_time(1*takt, sc_core::SC_NS);
   //write_bram(p,pivotCol);
-  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) pivotCol);
+  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (pivotCol*CONVERSE));
   //offset += sc_core::sc_time(1*takt, sc_core::SC_NS);
   printf("row=%d, col=%d",pivotRow,pivotCol);//cout<<"row="<<pivotRow<<", col="<<pivotCol<<endl;
   printf("%d\n",pivot);//cout<<pivot<<endl;
@@ -173,7 +171,7 @@ int main()
   print("Sent to bram\n");//cout<<"Sent to bram"<<endl;
 	
         //write_hard(ADDR_CMD, 1);
-		
+		Xil_Out32(START_REG,1);
         //cout<<"Starte hard"<<endl;
       
   
@@ -187,8 +185,9 @@ for (int i = 0; i < ROWSIZE; ++i)
      
      //offset += sc_core::sc_time(1*takt, sc_core::SC_NS);
      //read_bram(p++, tempwv);//read from bram
-	 tempw=(int)Xil_In32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4)
-      wv[i][j]=(float)tempwv;    
+	tempw=(int)Xil_In32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4);
+    wv[i][j]=(float)(tempwv/CONVERSE);
+	p++;
 	}
   }
 
