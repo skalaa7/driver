@@ -210,7 +210,7 @@ static int pivot_close(struct inode *i, struct file *f)
 		return 0;
 }
 //READ AND WRITE
-int row=0;
+
 int end_read=0;
  
 static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off)
@@ -250,12 +250,10 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		
 		case 1://device bram
 		printk(KERN_INFO "Reading from bram device\n");
-		for(j=row;j<ROWSIZE;j++)
+		for(j=0;j<ROWSIZE;j++)
 		{
-			for(i=0;i<COLSIZE;i++)
-				
+			for(
 		}
-		row++;
 		end_read=1;
 		break;
 		
