@@ -12,6 +12,9 @@
 #define CONVERSE 2097152
 char loc0[]="/dev/xlnx,pivot";
 char loc1[]="/dev/xlnx,bram";
+int i;
+int j;
+int p;
 void printmat(float wv[ROWSIZE][COLSIZE])
 {
 	for(int j=0;j<ROWSIZE; j++)
@@ -23,37 +26,82 @@ void printmat(float wv[ROWSIZE][COLSIZE])
 				printf("\n");
 			}
 }
-void read_bram()
+void read_bram(int wvrow[ROWSIZE*COLSIZE+1])
 {
+	#ifdef MMAP
+	#else
 	FILE *bram;
-	bram=fopen()
+	if(bram == NULL)
+	{
+		printf("Cannot open /dev/xlnx,bram for read\n");
+		return -1;
+	}
+	bram=fopen(loc1,"r")
+	for(p=1;p<ROWSIZE*COLSIZE+1;p++)
+	{
+		
+		fscanf(bram,"%d",wvrow[p])
+		
+	}	
+	fclose(bram);
+	#endif
 }
-void write_hard()
+void write_bram(int wvrow[ROWSIZE*COLSIZE+1])
 {
-	
+	#ifdef MMAP
+	#else
+	FILE *bram;
+	if(bram == NULL)
+	{
+		printf("Cannot open /dev/xlnx,bram for write\n");
+		return -1;
+	}
+	for(p=0;p<ROWSIZE*COLSIZE+1;p++)
+	{
+		bram=fopen(loc1,"w")
+		fprintf(bram,"%d,%d\n",p,wvrow[p]);
+		fclose(bram);
+	}
+
+	#endif;
 }
-void read_pivot()
+void read_pivot(int *ready, int *start)
 {
 	FILE *pivot;
-	pivot=fopen(loc0,'r');
+	pivot=fopen(loc0,"r");
 	if(pivot == NULL)
 	{
 		printf("Cannot open /dev/xlnx,pivot for read\n");
 		return -1;
 	}
-	fscanf(pivot,"")
-}
-void write_pivot()
-{
 	
+	fscanf(pivot,"%d",start);
+	fscanf(pivot,"%d",ready);
+	//printf("Start=%d,Ready=")
+	fclose(pivot);
+	
+}
+void write_pivot(int value)
+{
+	FILE *pivot;
+	pivot=fopne(loc0,"w");
+	if(pivot == NULL)
+	{
+		printf("Cannot open /dev/xlnx,pivot for write\n");
+		return -1;
+	}
+	fprintf(pivot,"%d",value);
+	fclose(pivot);
 }
 
 int main()
 {
     printf("\nHeloo\n");
     float wv[ROWSIZE][COLSIZE];
+	int wvrow[ROWSIZE*COLSIZE+1];
 	int indeks=0;
-
+	int ready=1;
+	int start=0;
 	for(int j=0;j<ROWSIZE; j++)
 	{
 		for(int i =0;i<COLSIZE;i++)
@@ -103,15 +151,17 @@ int main()
 		}
 	for(int j=0;j<ROWSIZE; j++)
 	{
-				for(int i =0;i<COLSIZE;i++)
-				{
-					printf("%f,",wv[j][i]);
-				}
-				printf("\n");
-			}
-	Xil_Out32(START_REG,0);
-	printf("Start:%d,Ready:%d\n",(int)Xil_In32(START_REG),(int)Xil_In32(READY_REG));////
-	printf("Counter0:%d\n",(int)Xil_In32(COUNTER_REG));
+		for(int i =0;i<COLSIZE;i++)
+		{
+			printf("%f,",wv[j][i]);
+		}
+		printf("\n");
+	}
+
+	
+	write_pivot(0);
+	read_pivot(&ready,&start);
+	printf("Start=%d,ready=%d",start,ready);
 	printf("Read from baza\n");
 	//-----------------------------------------------------------------
     //CalculateSimplex
@@ -122,8 +172,6 @@ int main()
     bool optimality=false;
     float pivot;
     int count=0;
-    int p;
-    int i;
     int tempor=0;
     //u32 tempneg=0;
     float tempflo;
@@ -201,57 +249,50 @@ int main()
   p = 0;
   for(int j=0;j<COLSIZE;j++)
   {
-	
-		  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (wv[pivotRow][j]*CONVERSE));////
-
-		  p++;
+		wvrow[p]=(int) (wv[pivotRow][j]*CONVERSE);
+		p++;
   }
-  printf("p=%d\n",p);
+  
   print("Sent pivot row\n");
   for (int i = 1; i < ROWSIZE; ++i)
   {
   	if(i!=pivotRow){
         for (int j = 0; j < COLSIZE; ++j)
         {
-        
-        	Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (wv[i][j]*CONVERSE));////
-
- 
-		  p++;
-
-
+			wvrow[p]=(int) (wv[i][j]*CONVERSE);
+			p++;
+		}
 	}
-	}
-
   }
-  printf("Sent matrix p=%d\n",p);
-
-  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4,(int) (pivotCol*CONVERSE));////
+  printf("Sent matrix \n");
+  wvrow[p]=(int) (pivotCol*CONVERSE);
+  
   
   printf("p=%d\n",p);
  
   printf("row=%d, col=%d\n",pivotRow,pivotCol);
   printf("pivot=%f\n",pivot);
-  Xil_Out32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR,(int) (wv[pivotRow][0]*CONVERSE));////
+  write_bram(wvrow);
+  
   print("Sent to bram\n");
 
 
-		Xil_Out32(START_REG,1);///
+		write_pivot(1);///
 
-		Xil_Out32(START_REG,0);////
+		write_pivot(0);///
 
 		print("Pivot complete\n");
 
-
+read_bram(wvrow);
+  
   p=1;  
-
 for (int i = 0; i < ROWSIZE; ++i)
   {
   for (int j = 0; j < COLSIZE; ++j)
   {
 
 
-	  tempor=(int)Xil_In32(XPAR_AXI_BRAM_CTRL_0_S_AXI_BASEADDR+p*4);//readbram
+	  tempor=wvrow[p];//readbram
 	  wv[i][j]=(float)tempor;
 	  wv[i][j]=wv[i][j]/CONVERSE;
   p++;
