@@ -31,6 +31,10 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define NUMOFSLACK 50
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
+#define START_REG (0x00)
+#define READY_REG (0x04)
+#define COUNTER_REG (0x08)
+
 static int pivot_probe(struct platform_device *pdev);
 static int pivot_remove(struct platform_device *pdev);
 static int pivot_open(struct inode *i, struct file *f);
