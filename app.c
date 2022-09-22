@@ -9,7 +9,7 @@
 #define NUMOFSLACK 3
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
-#define CONVERSE 2097152
+
 char loc0[]="/dev/xlnx,pivot";
 char loc1[]="/dev/xlnx,bram";
 int i;
@@ -26,7 +26,33 @@ void printmat(float wv[ROWSIZE][COLSIZE])
 				printf("\n");
 			}
 }
-void read_bram(int wvrow[ROWSIZE*COLSIZE+1])
+unsigned int float2uint32(float x)
+{
+    if(x>=0)
+    {
+        printf("%f,%u\n",x,(unsigned int)(x*2097152));
+        return (unsigned int)(x*2097152);
+    }
+    else
+    {
+        printf("%f,%u\n",x,4294967295+(unsigned int)(x*2097152)+1);
+        return 4294967295+(unsigned int)(x*2097152)+1;
+    }
+}
+float uint2float(unsigned int x)
+{
+    if(x>=2147483648)
+    {
+        printf("%u,%f\n",x,((float)(x-4294967295))/2097152);
+        return ((float)(x-4294967295))/2097152;
+    }
+    else
+    {
+        printf("%u,%f\n",x,((float)x)/2097152);
+        return ((float)x)/2097152;
+    }
+}
+void read_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 {
 	#ifdef MMAP
 	#else
@@ -40,13 +66,13 @@ void read_bram(int wvrow[ROWSIZE*COLSIZE+1])
 	for(p=0;p<ROWSIZE*COLSIZE+1;p++)
 	{
 		
-		fscanf(bram,"%d",wvrow[p])
+		fscanf(bram,"%u",wvrow[p]);
 		
 	}	
 	fclose(bram);
 	#endif
 }
-void write_bram(int wvrow[ROWSIZE*COLSIZE+1])
+void write_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 {
 	#ifdef MMAP
 	#else
@@ -59,7 +85,7 @@ void write_bram(int wvrow[ROWSIZE*COLSIZE+1])
 	for(p=0;p<ROWSIZE*COLSIZE+1;p++)
 	{
 		bram=fopen(loc1,"w")
-		fprintf(bram,"%d,%d\n",p,wvrow[p]);
+		fprintf(bram,"%d,%u\n",p,wvrow[p]);
 		fclose(bram);
 	}
 
@@ -249,7 +275,7 @@ int main()
   p = 0;
   for(int j=0;j<COLSIZE;j++)
   {
-		wvrow[p]=(int) (wv[pivotRow][j]*CONVERSE);
+		wvrow[p]=float2uint32(wv[pivotRow][j]);
 		p++;
   }
   
@@ -259,13 +285,14 @@ int main()
   	if(i!=pivotRow){
         for (int j = 0; j < COLSIZE; ++j)
         {
-			wvrow[p]=(int) (wv[i][j]*CONVERSE);
+			wvrow[p]=float2uint32(wv[i][j]);
 			p++;
 		}
 	}
   }
   printf("Sent matrix \n");
-  wvrow[p]=(int) (pivotCol*CONVERSE);
+  wvrow[p]=float2uint32(pivotCol);
+  
   
   
   printf("p=%d\n",p);
@@ -292,9 +319,9 @@ for (int i = 0; i < ROWSIZE; ++i)
   {
 
 
-	  tempor=wvrow[p];//readbram
-	  wv[i][j]=(float)tempor;
-	  wv[i][j]=wv[i][j]/CONVERSE;
+	  
+	  wv[i][j]=uint2float(wvrow[p]);
+	  
   p++;
   }
   }

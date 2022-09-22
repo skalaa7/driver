@@ -224,7 +224,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	u32 start_reg=0;
 	u32 ready_reg=0;
 	//u32 counter_reg=0;
-	u32 val=0;
+	u32 bram_val=0;
 	int i=0;
 	int j=0;
 	int minor = MINOR(f->f_inode->i_rdev);
@@ -247,6 +247,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		len=scnprintf(buf,BUFF_SIZE,"Start=%d,Ready=%d\n",start_reg,ready_reg);
 		if(copy_to_user(buffer,buf,len)
 		{
+			printk(KERN_ERR "Copy to user does not work\n");
 			return -EFAULT;
 		}
 		end_read=1;
@@ -254,13 +255,24 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		
 		case 1://device bram
 		printk(KERN_INFO "Reading from bram device\n");
-		for(j=row;j<ROWSIZE;j++)
+		bram_val=ioread32(bram->base_addr+i*4);
+		if(i<ROWSIZE*COLSIZE+1)
 		{
-			for(i=0;i<COLSIZE;i++)
-				
+			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 		}
-		row++;
-		end_read=1;
+		*offset+=len;
+		if(copy_to_user(buffer,buff,len))
+		{
+			printk(KERN_ERR "Copy to user does not work\n");
+			return -EFAULT;
+		}
+		i++;
+		if(i==ROWSIZE*COLSIZE+1)
+		{
+			printk(KERN_INFO "Succesfully read from bram\n");
+			i=0;
+			end_read=1;
+		}
 		break;
 		
 		default:
@@ -272,6 +284,28 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 
 static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off)
 {
+	char buf[length+1];
+	int minor = MINOR(f->f_inode->i_rdev);
+	unsigned int pos=0,reg_val=0,bram_val=0;
+	if(copy_from_user(buf,buffer,length))
+		return -EFAULT;
+	buf[length]='\0';
+	switch(minor)
+	{
+		case 0: //device pivot
+		sscanf(buf,"%u",&reg_val);
+		iowrite32(reg_val,pivot->base_addr+0);
+		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);
+		break;
+		case 1:
+		sscanf(buf,"%d,%u",&pos,&bram_val);
+		iowrite32(bram_val,bram->base_addr+(pos*4));
+		printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
+		break;
+		default:
+		printk(KERN_ERR "Invalid minor\n");
+	}
+	
 	
 }
 //////////////
