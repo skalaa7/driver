@@ -224,7 +224,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	u32 start_reg=0;
 	u32 ready_reg=0;
 	//u32 counter_reg=0;
-	u32 val=0;
+	u32 bram_val=0;
 	int i=0;
 	int j=0;
 	int minor = MINOR(f->f_inode->i_rdev);
@@ -258,7 +258,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		bram_val=ioread32(bram->base_addr+i*4);
 		if(i<ROWSIZE*COLSIZE+1)
 		{
-			len=scnprintf(buf,BUFF_SIZE,"%d",bram_val);
+			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 		}
 		*offset+=len;
 		if(copy_to_user(buffer,buff,len))
@@ -298,7 +298,7 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);
 		break;
 		case 1:
-		sscanf(buf,"%d,%d",&pos,&bram_val);
+		sscanf(buf,"%d,%u",&pos,&bram_val);
 		iowrite32(bram_val,bram->base_addr+(pos*4));
 		printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
 		break;

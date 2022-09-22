@@ -40,15 +40,18 @@ unsigned int float2uint32(float x)
     }
 }
 float uint2float(unsigned int x)
-	if(x>=214783648)
-	{
-		return (float)(4294967295-
-	}
-	else
-	{
-		
-	}
-	
+{
+    if(x>=2147483648)
+    {
+        printf("%u,%f\n",x,((float)(x-4294967295))/2097152);
+        return ((float)(x-4294967295))/2097152;
+    }
+    else
+    {
+        printf("%u,%f\n",x,((float)x)/2097152);
+        return ((float)x)/2097152;
+    }
+}
 void read_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 {
 	#ifdef MMAP
@@ -316,9 +319,9 @@ for (int i = 0; i < ROWSIZE; ++i)
   {
 
 
-	  tempor=wvrow[p];//readbram
-	  wv[i][j]=(float)tempor;
-	  wv[i][j]=wv[i][j]/CONVERSE;
+	  
+	  wv[i][j]=uint2float(wvrow[p]);
+	  
   p++;
   }
   }

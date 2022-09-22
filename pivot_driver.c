@@ -111,7 +111,7 @@ static int pivot_probe(struct platform_device *pdev)
         }
       pivot->mem_start = r_mem->start;
       pivot->mem_end   = r_mem->end;
-      if(!request_mem_region(pivot->mem_start, pivot->mem_end -pivt->mem_start+1, DRIVER_NAME))
+      if(!request_mem_region(pivot->mem_start, pivot->mem_end - pivot->mem_start+1, DRIVER_NAME))
         {
           printk(KERN_ALERT "Couldn't lock memory region at %p\n",(void *)pivot->mem_start);
           rc = -EBUSY;
