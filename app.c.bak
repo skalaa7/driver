@@ -84,7 +84,7 @@ void write_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 	}
 	for(p=0;p<ROWSIZE*COLSIZE+1;p++)
 	{
-		bram=fopen(loc1,"w")
+		bram=fopen(loc1,"w");/// da li je "w"?
 		fprintf(bram,"%d,%u\n",p,wvrow[p]);
 		fclose(bram);
 	}
