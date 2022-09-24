@@ -84,17 +84,18 @@ void write_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 	}
 	for(p=0;p<ROWSIZE*COLSIZE+1;p++)
 	{
-		bram=fopen(loc1,"w");/// da li je "w"?
+		bram=fopen(loc1,"w");
 		fprintf(bram,"%d,%u\n",p,wvrow[p]);
 		fclose(bram);
 	}
 
 	#endif;
 }
-void read_pivot(int *ready, int *start)
+int read_pivot(int *start,int *ready)
 {
 	FILE *pivot;
 	pivot=fopen(loc0,"r");
+	int start,ready;
 	if(pivot == NULL)
 	{
 		printf("Cannot open /dev/xlnx,pivot for read\n");
@@ -102,8 +103,8 @@ void read_pivot(int *ready, int *start)
 	}
 	
 	fscanf(pivot,"%d %d",start,ready);
-	//printf("Start=%d,Ready=")
 	fclose(pivot);
+	return ready;
 	
 }
 void write_pivot(int value)
@@ -306,6 +307,8 @@ int main()
 		write_pivot(1);///
 
 		write_pivot(0);///
+		
+		while(!read_pivot());
 
 		print("Pivot complete\n");
 

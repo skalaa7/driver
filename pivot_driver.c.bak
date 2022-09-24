@@ -19,6 +19,8 @@
 #include <linux/dma-mapping.h>  //dma access
 #include <linux/mm.h>
 #include <linux/ioport.h>
+#include <linux/semaphore.h>
+#include <linux/wait.h>
 
 MODULE_AUTHOR ("Embedjedi");
 MODULE_DESCRIPTION("Test Driver for PIVOT IP.");
@@ -58,6 +60,9 @@ static struct class *my_class;
 static struct device *my_device;
 static struct device_info *pivot = NULL; //naziv
 static struct device_info *bram  = NULL;//naziv
+struct semaphore sem_ip;
+struct semaphore sem_bram;
+DECLARE_WAIT_QUEUE_HEAD(readyQ);
 
 static struct file_operations my_fops =
 {
@@ -227,7 +232,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	u32 bram_val=0;
 	int minor = MINOR(f->f_inode->i_rdev);
 	
-	printk(KERN_INFO "i=%d,len=%ld,end_read=%d\n",p,len,end_read);
+	printk(KERN_INFO "addr=%d,len=%ld,end_read=%d\n",p,len,end_read);
 	if(end_read==1)
 	{
 		end_read=0;
@@ -239,8 +244,12 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	{
 		case 0://device pivot
 		printk(KERN_INFO "Reading from pivot device\n");
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
 		start_reg=ioread32(pivot->base_addr);
 		ready_reg=ioread32(pivot->base_addr+4);
+		if(ready_reg==1)
+			wake_up_interruptible(&readyQ);
 		//counter_reg=ioread32(pivot->base_addr+8);
 		len=scnprintf(buf,BUFF_SIZE,"Start=%d,Ready=%d\n",start_reg,ready_reg);
 		if(copy_to_user(buffer,buf,len)
@@ -248,29 +257,46 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 			printk(KERN_ERR "Copy to user does not work\n");
 			return -EFAULT;
 		}
+		up(&sem_ip);
 		end_read=1;
 		break;
 		
 		case 1://device bram
-		printk(KERN_INFO "Reading from bram device\n");
-		bram_val=ioread32(bram->base_addr+p*4);
-		if(p<ROWSIZE*COLSIZE+1)
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
+		while(ioread32(pivot->base_addr+4)==0)
 		{
-			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
+			up(&sem_ip);
+			if(wait_event_interruptible(readyQ,(ioread32(pivot->base_addr+4)==1)))
+				return -ERESTARTSYS;
+			if(down_interruptible(&sem_ip))
+				return -ERESTARTSYS;
 		}
-		*offset+=len;
-		if(copy_to_user(buffer,buff,len))
+		if(ioread32(pivot->base_addr+4)==1)
 		{
-			printk(KERN_ERR "Copy to user does not work\n");
-			return -EFAULT;
+			printk(KERN_INFO "Reading from bram device\n");
+			bram_val=ioread32(bram->base_addr+p*4);
+			if(p<ROWSIZE*COLSIZE+1)
+			{
+				len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
+			}
+			*offset+=len;
+			if(copy_to_user(buffer,buff,len))
+			{
+				printk(KERN_ERR "Copy to user does not work\n");
+				return -EFAULT;
+			}
+			p++;
+			if(p==ROWSIZE*COLSIZE+1)
+			{
+				printk(KERN_INFO "Succesfully read from bram\n");
+				p=0;
+				end_read=1;
+			}
+			up(&sem_bram);
 		}
-		p++;
-		if(p==ROWSIZE*COLSIZE+1)
-		{
-			printk(KERN_INFO "Succesfully read from bram\n");
-			p=0;
-			end_read=1;
-		}
+		else
+			up(&sem_ip);
 		break;
 		
 		default:
@@ -291,14 +317,54 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 	switch(minor)
 	{
 		case 0: //device pivot
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
 		sscanf(buf,"%u",&reg_val);
 		iowrite32(reg_val,pivot->base_addr+0);
-		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);
+		
+		if(start_val==1)
+		{
+			while(ioread32(pivot->base_addr+4)==0)
+			{
+				up(&sem_ip);
+				if(wait_event_interruptible(readyQ,(ioread32(pivot->base_addr+4)==1)))
+					return -ERESTARTSYS;
+				if(down_interruptible(&sem_ip))
+					return -ERESTARTSYS;
+			}
+			if(ioread32(pivot->base_addr+4)==1)
+			{
+				iowrite32(reg_val,pivot->base_addr+0);	
+			}
+		}
+		iowrite32(reg_val,pivot->base_addr+0);
+		up(&sem_ip);
+		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);		
 		break;
+		
 		case 1:
-		sscanf(buf,"%d,%u",&pos,&bram_val);
-		iowrite32(bram_val,bram->base_addr+(pos*4));
-		printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
+		while(ioread32(pivot->base_addr+4)==0)
+		{
+			up(&sem_ip);
+			if(wait_event_interruptible(readyQ,(ioread32(pivot->base_addr+4)==1)))
+				return -ERESTARTSYS;
+			if(down_interruptible(&sem_ip))
+				return -ERESTARTSYS;
+		}
+		if(ready==1)
+		{
+			up(&sem_ip);
+			if(down_interruptible(&sem_bram))
+				return -ERESTARTSYS;
+			sscanf(buf,"%d,%u",&pos,&bram_val);
+			iowrite32(bram_val,bram->base_addr+(pos*4));
+			printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
+			up(&sem_bram);
+		}
+		else
+			up(&sem_ip);
 		break;
 		default:
 		printk(KERN_ERR "Invalid minor\n");
@@ -317,6 +383,9 @@ static int __init pivot_init(void)
    printk(KERN_INFO "\n");
    printk(KERN_INFO "PIVOT driver starting insmod.\n");
 
+	sema_init(&sem_bram,1);
+	sema_init(&sem_ip,1);
+	
    if (alloc_chrdev_region(&my_dev_id, 0, 2, "pivot_region") < 0){
       printk(KERN_ERR "failed to register char device\n");
       return -1;

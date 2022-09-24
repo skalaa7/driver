@@ -52,7 +52,7 @@ static dev_t my_dev_id;
 static struct class *my_class;
 static struct device *my_device;
 struct semaphore sem_ip;
-struct semaphore sem_braml
+struct semaphore sem_bram;
 DECLARE_WAIT_QUEUE_HEAD(readyQ);
 static struct file_operations my_fops =
 {
@@ -104,7 +104,8 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		if(down_interruptible(&sem_ip))
 			return -ERESTARTSYS;
 		printk(KERN_INFO "Reading from pivot device\n");
-		//counter_reg=ioread32(pivot->base_addr+8);
+		if(ready==1)
+			wake_up_interruptible(&readyQ);
 		len=scnprintf(buf,BUFF_SIZE,"Start=%d,Ready=%d\n",start,ready);
 		if(copy_to_user(buffer,buf,len)
 		{
@@ -152,7 +153,8 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 			}
 			up(&sem_bram);
 		}
-		up(&sem_ip);
+		else
+			up(&sem_ip);
 		break;
 		
 		default:
@@ -166,7 +168,7 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 {
 	char buf[length+1];
 	int minor = MINOR(f->f_inode->i_rdev);
-	unsigned int pos=0,rbram_val=0;
+	unsigned int pos=0,rbram_val=0,start_val=0;
 	if(copy_from_user(buf,buffer,length))
 		return -EFAULT;
 	buf[length]='\0';
@@ -175,9 +177,8 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 		case 0: //device pivot
 		if(down_interruptible(&sem_ip))
 			return -ERESTARTSYS;
-		sscanf(buf,"%u",&start);
-		printk(KERN_INFO "Wrote succesfully to start register value %u\n",start);
-		if(start==1)
+		sscanf(buf,"%u",&start_val);
+		if(start_val==1)
 		{
 			while(ready==0)
 			{
@@ -189,11 +190,14 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 			}
 			if(ready==1)
 			{
+				start=start_val;
 				do_pivoting();
-				wake_up_interruptible(&readyQ);
 			}
 		}
-		up(&sem_ip);	
+		else
+			start=start_val;
+		up(&sem_ip);
+		printk(KERN_INFO "Wrote succesfully to start register value %u\n",start_val);
 		break;
 		case 1:
 		if(down_interruptible(&sem_ip))
@@ -216,7 +220,8 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 			printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
 			up(&sem_bram);
 		}
-		up(&sem_ip);
+		else
+			up(&sem_ip);
 		break;
 		default:
 		printk(KERN_ERR "Invalid minor\n");
