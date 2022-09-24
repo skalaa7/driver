@@ -101,8 +101,7 @@ void read_pivot(int *ready, int *start)
 		return -1;
 	}
 	
-	fscanf(pivot,"%d",start);
-	fscanf(pivot,"%d",ready);
+	fscanf(pivot,"%d %d",start,ready);
 	//printf("Start=%d,Ready=")
 	fclose(pivot);
 	

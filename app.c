@@ -267,7 +267,7 @@ int main()
         pivotRow=loc;
 
         pivot=wv[pivotRow][pivotCol];
-
+		//wv[pivotRow][pivotCol]=1/wv[pivotRow][pivotCol]; za softverski implementiran hardver u drajveru
 
         //printmat(wv);
         print("Sending to bram\n");
@@ -311,7 +311,7 @@ int main()
 
 read_bram(wvrow);
   
-  p=1;  
+  p=1;  //p=1 za softverski implementiran hardver u drajveru
 for (int i = 0; i < ROWSIZE; ++i)
   {
   for (int j = 0; j < COLSIZE; ++j)

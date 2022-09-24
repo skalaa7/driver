@@ -79,6 +79,7 @@ static int pivot_close(struct inode *i, struct file *f)
 int end_read=0;
 unsigned int bram[ROWSIZE*COLSIZE+1];
 int start=0,ready=1;
+int p=0;
  
 static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off)
 {
@@ -86,8 +87,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	long int len=0;
 	//u32 counter_reg=0;
 	u32 bram_val=0;
-	int i=0;
-	int j=0;
+	
 	int minor = MINOR(f->f_inode->i_rdev);
 	
 	printk(KERN_INFO "i=%d,len=%ld,end_read=%d\n",i,len,end_read);
@@ -128,11 +128,12 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		}
 		if(ready==1)
 		{
+			up(&sem_ip);
 			if(down_interruptible(&sem_bram))
 				return -ERESTARTSYS;
 			printk(KERN_INFO "Reading from bram device\n");
-			bram_val=bram[i];
-			if(i<ROWSIZE*COLSIZE+1)
+			bram_val=bram[p];
+			if(p<ROWSIZE*COLSIZE+1)
 			{
 			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 			}
@@ -142,15 +143,17 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 				printk(KERN_ERR "Copy to user does not work\n");
 				return -EFAULT;
 			}
-			i++;
-			if(i==ROWSIZE*COLSIZE+1)
+			p++;
+			if(p==ROWSIZE*COLSIZE+1)
 			{
 				printk(KERN_INFO "Succesfully read from bram\n");
-				i=0;
+				p=0;
 				end_read=1;
 			}
 			up(&sem_bram);
 		}
+		else
+			up(&sem_ip);
 		break;
 		
 		default:
@@ -174,12 +177,24 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 		if(down_interruptible(&sem_ip))
 			return -ERESTARTSYS;
 		sscanf(buf,"%u",&start);
-		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);
-		
-			do_pivoting();
+		printk(KERN_INFO "Wrote succesfully to start register value %u\n",start);
+		if(start==1)
+		{
+			while(ready==0)
+			{
 			up(&sem_ip);
-			wake_up_interruptible(&readyQ);
-			
+			if(wait_event_interruptible(readyQ,(ready==1)))
+				return -ERESTARTSYS;
+			if(down_interruptible(&sem_ip))
+				return -ERESTARTSYS;
+			}
+			if(ready==1)
+			{
+				do_pivoting();
+				wake_up_interruptible(&readyQ);
+			}
+		}
+		up(&sem_ip);	
 		break;
 		case 1:
 		if(down_interruptible(&sem_ip))
@@ -194,6 +209,7 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 		}
 		if(ready==1)
 		{
+			up(&sem_ip);
 			if(down_interruptible(&sem_bram))
 				return -ERESTARTSYS;
 			sscanf(buf,"%d,%u",&pos,&bram_val);
@@ -201,6 +217,8 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 			printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
 			up(&sem_bram);
 		}
+		else
+			up(&sem_ip);
 		break;
 		default:
 		printk(KERN_ERR "Invalid minor\n");
@@ -219,18 +237,23 @@ void do_pivoting()
 	int pivotRow=0;
 	unsigned int pivotCol;
 	unsigned int temp1,temp2;
-	for(int i=0;i<COLSIZE;i++)
+	int i=0;
+	int j=0;
+	pivotRow=0;
+	pivotCol=bram[ROWSIZE*COLSIZE];
+	pivot=bram[pivotRow*COLSIZE+pivotCol];
+	for(i=0;i<COLSIZE;i++)
 	{
-		newRow[i] = bram[pivotRow*COLSIZE+i]/pivot;////float?
+		newRow[i] = bram[pivotRow*COLSIZE+i]/pivot;//kako float
 		bram[pivotRow*COLSIZE+i]=newRow[i];
 	}
-	for(int j=1;j<ROWSIZE;j++)
+	for(j=1;j<ROWSIZE;j++)
 	{
 		pivotColVal[j] = bram[j*COLSIZE+pivotCol];
 	}
-	for(int j=1;j<ROWSIZE-1;j=j+2)
+	for(j=1;j<ROWSIZE-1;j=j+2)
 	{
-		for(int i=0;i<COLSIZE;i++)
+		for(i=0;i<COLSIZE;i++)
 		{
 			temp1 = bram[j*COLSIZE+i]-newRow[i]*pivotColVal[j];
 			bram[j*COLSIZE+i]=temp1;
@@ -245,7 +268,13 @@ static int __init pivot_init(void)
 {
    printk(KERN_INFO "\n");
    printk(KERN_INFO "PIVOT driver starting insmod.\n");
-
+	
+	sema_init(&sem_bram,1);
+	sema_init(&sem_ip,1);
+	
+	for(i=0;i<ROWSIZE*COLSIZE+1;i++)//Initialize bram
+		bram[i]=0;
+		
    if (alloc_chrdev_region(&my_dev_id, 0, 2, "pivot_region") < 0){
       printk(KERN_ERR "failed to register char device\n");
       return -1;

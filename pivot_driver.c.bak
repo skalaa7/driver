@@ -111,7 +111,7 @@ static int pivot_probe(struct platform_device *pdev)
         }
       pivot->mem_start = r_mem->start;
       pivot->mem_end   = r_mem->end;
-      if(!request_mem_region(pivot->mem_start, pivot->mem_end -pivt->mem_start+1, DRIVER_NAME))
+      if(!request_mem_region(pivot->mem_start, pivot->mem_end - pivot->mem_start+1, DRIVER_NAME))
         {
           printk(KERN_ALERT "Couldn't lock memory region at %p\n",(void *)pivot->mem_start);
           rc = -EBUSY;
@@ -214,7 +214,7 @@ static int pivot_close(struct inode *i, struct file *f)
 		return 0;
 }
 //READ AND WRITE
-int row=0;
+int p=0;
 int end_read=0;
  
 static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off)
@@ -225,11 +225,9 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	u32 ready_reg=0;
 	//u32 counter_reg=0;
 	u32 bram_val=0;
-	int i=0;
-	int j=0;
 	int minor = MINOR(f->f_inode->i_rdev);
 	
-	printk(KERN_INFO "i=%d,len=%ld,end_read=%d\n",i,len,end_read);
+	printk(KERN_INFO "i=%d,len=%ld,end_read=%d\n",p,len,end_read);
 	if(end_read==1)
 	{
 		end_read=0;
@@ -255,8 +253,8 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		
 		case 1://device bram
 		printk(KERN_INFO "Reading from bram device\n");
-		bram_val=ioread32(bram->base_addr+i*4);
-		if(i<ROWSIZE*COLSIZE+1)
+		bram_val=ioread32(bram->base_addr+p*4);
+		if(p<ROWSIZE*COLSIZE+1)
 		{
 			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 		}
@@ -266,11 +264,11 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 			printk(KERN_ERR "Copy to user does not work\n");
 			return -EFAULT;
 		}
-		i++;
-		if(i==ROWSIZE*COLSIZE+1)
+		p++;
+		if(p==ROWSIZE*COLSIZE+1)
 		{
 			printk(KERN_INFO "Succesfully read from bram\n");
-			i=0;
+			p=0;
 			end_read=1;
 		}
 		break;
