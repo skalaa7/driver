@@ -19,6 +19,8 @@
 #include <linux/dma-mapping.h>  //dma access
 #include <linux/mm.h>
 #include <linux/ioport.h>
+#include <linux/semaphore.h>
+#include <linux/wait.h>
 
 MODULE_AUTHOR ("Embedjedi");
 MODULE_DESCRIPTION("Test Driver for PIVOT IP.");
@@ -45,19 +47,13 @@ static int __init pivot_init(void);
 static void __exit pivot_exit(void);
 void do_pivoting();
 
-struct device_info
-{
-  unsigned long mem_start;
-  unsigned long mem_end;
-  void __iomem *base_addr;
-};
-
 static struct cdev *my_cdev;
 static dev_t my_dev_id;
 static struct class *my_class;
 static struct device *my_device;
-
-
+struct semaphore sem_ip;
+struct semaphore sem_braml
+DECLARE_WAIT_QUEUE_HEAD(readyQ);
 static struct file_operations my_fops =
 {
 	.owner = THIS_MODULE,
@@ -105,6 +101,8 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	switch(minor)
 	{
 		case 0://device pivot
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
 		printk(KERN_INFO "Reading from pivot device\n");
 		//counter_reg=ioread32(pivot->base_addr+8);
 		len=scnprintf(buf,BUFF_SIZE,"Start=%d,Ready=%d\n",start,ready);
@@ -113,12 +111,25 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 			printk(KERN_ERR "Copy to user does not work\n");
 			return -EFAULT;
 		}
+		up(&sem_ip);
 		end_read=1;
 		break;
 		
 		case 1://device bram
-		if(ready==0)
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
+		while(ready==0)
 		{
+			up(&sem_ip);
+			if(wait_event_interruptible(readyQ,(ready==1)))
+				return -ERESTARTSYS;
+			if(down_interruptible(&sem_ip))
+				return -ERESTARTSYS;
+		}
+		if(ready==1)
+		{
+			if(down_interruptible(&sem_bram))
+				return -ERESTARTSYS;
 			printk(KERN_INFO "Reading from bram device\n");
 			bram_val=bram[i];
 			if(i<ROWSIZE*COLSIZE+1)
@@ -138,6 +149,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 				i=0;
 				end_read=1;
 			}
+			up(&sem_bram);
 		}
 		break;
 		
@@ -159,18 +171,40 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 	switch(minor)
 	{
 		case 0: //device pivot
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
 		sscanf(buf,"%u",&start);
 		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);
-		if(start==1 && ready==0)
+		
 			do_pivoting();
+			up(&sem_ip);
+			wake_up_interruptible(&readyQ);
+			
 		break;
 		case 1:
-		sscanf(buf,"%d,%u",&pos,&bram_val);
-		bram[pos]=bram_val;
-		printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
+		if(down_interruptible(&sem_ip))
+			return -ERESTARTSYS;
+		while(ready==0)
+		{
+			up(&sem_ip);
+			if(wait_event_interruptible(readyQ,(ready==1)))
+				return -ERESTARTSYS;
+			if(down_interruptible(&sem_ip))
+				return -ERESTARTSYS;
+		}
+		if(ready==1)
+		{
+			if(down_interruptible(&sem_bram))
+				return -ERESTARTSYS;
+			sscanf(buf,"%d,%u",&pos,&bram_val);
+			bram[pos]=bram_val;
+			printk(KERN_INFO "Wrote succesfully into bram. pos = %d, val = %d\n", pos,bram_val);
+			up(&sem_bram);
+		}
 		break;
 		default:
 		printk(KERN_ERR "Invalid minor\n");
+		
 	}
 	
 	

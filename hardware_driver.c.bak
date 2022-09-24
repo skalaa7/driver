@@ -117,25 +117,27 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 		break;
 		
 		case 1://device bram
-		if(ready=
-		printk(KERN_INFO "Reading from bram device\n");
-		bram_val=bram[i];
-		if(i<ROWSIZE*COLSIZE+1)
+		if(ready==0)
 		{
+			printk(KERN_INFO "Reading from bram device\n");
+			bram_val=bram[i];
+			if(i<ROWSIZE*COLSIZE+1)
+			{
 			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
-		}
-		*offset+=len;
-		if(copy_to_user(buffer,buff,len))
-		{
-			printk(KERN_ERR "Copy to user does not work\n");
-			return -EFAULT;
-		}
-		i++;
-		if(i==ROWSIZE*COLSIZE+1)
-		{
-			printk(KERN_INFO "Succesfully read from bram\n");
-			i=0;
-			end_read=1;
+			}
+			*offset+=len;
+			if(copy_to_user(buffer,buff,len))
+			{
+				printk(KERN_ERR "Copy to user does not work\n");
+				return -EFAULT;
+			}
+			i++;
+			if(i==ROWSIZE*COLSIZE+1)
+			{
+				printk(KERN_INFO "Succesfully read from bram\n");
+				i=0;
+				end_read=1;
+			}
 		}
 		break;
 		
