@@ -374,7 +374,13 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 //////////////
 static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s)
 {
-	
+	if (remap_pfn_range(vma, vma->vm_start, vm->vm_pgoff,
+						vma->vm_end - vma->vm_start,
+						vma->vm_page_prot))
+		return -EAGAIN;
+		vma->vm_ops = &simple_remap_vm_ops;
+		simple_vma_open(vma);
+		return 0;
 }
 
 static int __init pivot_init(void)

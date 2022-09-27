@@ -320,8 +320,6 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 		if(down_interruptible(&sem_ip))
 			return -ERESTARTSYS;
 		sscanf(buf,"%u",&reg_val);
-		iowrite32(reg_val,pivot->base_addr+0);
-		
 		if(start_val==1)
 		{
 			while(ioread32(pivot->base_addr+4)==0)
@@ -337,7 +335,8 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 				iowrite32(reg_val,pivot->base_addr+0);	
 			}
 		}
-		iowrite32(reg_val,pivot->base_addr+0);
+		else
+			iowrite32(reg_val,pivot->base_addr+0);
 		up(&sem_ip);
 		printk(KERN_INFO "Wrote succesfully to start register value %u\n",reg_val);		
 		break;
@@ -375,7 +374,15 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 //////////////
 static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s)
 {
+	unsigned long len=vma->vm_end-vma->start;
+	int ret;
 	
+	ret=remap_pfn_range(vma,vma->vm_start,pfn,len,vma=>vm_page_prot);
+	if(ret<0)
+	{
+		printk(KERN_ERR "Could not map the address area\n");
+		erutn -EIO;
+	}
 }
 
 static int __init pivot_init(void)

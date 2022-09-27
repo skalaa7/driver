@@ -2,14 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include "baza.h"
 #define DELILAC 100 //for normalization
 #define QUOT 10//for normalization
 #define NUMOFVAR 3
 #define NUMOFSLACK 3
 #define ROWSIZE (NUMOFSLACK+1)
 #define COLSIZE (NUMOFSLACK+NUMOFVAR+1)
-
+#define MAX_PKT_SIZE (ROWSIZE*COLSIZE+1)
 char loc0[]="/dev/xlnx,pivot";
 char loc1[]="/dev/xlnx,bram";
 int i;
@@ -55,6 +55,24 @@ float uint2float(unsigned int x)
 void read_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 {
 	#ifdef MMAP
+	// If memory map is defined send image directly via mmap
+	int fd;
+	int *p;
+	fd = open(loc1, O_RDWR|O_NDELAY);
+	if (fd < 0)
+	{
+		printf("Cannot open /dev/xlnx,bram for write\n");
+		return -1;
+	}
+	p=(int*)mmap(0,5152*4, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	memcpy(wvrow, p, MAX_PKT_SIZE);
+	munmap(p, MAX_PKT_SIZE);
+	close(fd);
+	if (fd < 0)
+	{
+		printf("Cannot close /dev/xlnx,bram for write\n");
+		return -1;
+	}
 	#else
 	FILE *bram;
 	if(bram == NULL)
@@ -75,6 +93,24 @@ void read_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 void write_bram(unsigned int wvrow[ROWSIZE*COLSIZE+1])
 {
 	#ifdef MMAP
+	// If memory map is defined send image directly via mmap
+	int fd;
+	int *p;
+	fd = open(loc1, O_RDWR|O_NDELAY);
+	if (fd < 0)
+	{
+		printf("Cannot open /dev/xlnx,bram for write\n");
+		return -1;
+	}
+	p=(int*)mmap(0,5152*4, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	memcpy(p, wvrow, MAX_PKT_SIZE);
+	munmap(p, MAX_PKT_SIZE);
+	close(fd);
+	if (fd < 0)
+	{
+		printf("Cannot close /dev/xlnx,bram for write\n");
+		return -1;
+	}
 	#else
 	FILE *bram;
 	if(bram == NULL)
@@ -110,7 +146,7 @@ int read_pivot(int *start,int *ready)
 void write_pivot(int value)
 {
 	FILE *pivot;
-	pivot=fopne(loc0,"w");
+	pivot=fopen(loc0,"w");
 	if(pivot == NULL)
 	{
 		printf("Cannot open /dev/xlnx,pivot for write\n");
@@ -128,6 +164,8 @@ int main()
 	int indeks=0;
 	int ready=1;
 	int start=0;
+	//FILE *baza;
+	//baza=fopen("baza.txt","r");
 	for(int j=0;j<ROWSIZE; j++)
 	{
 		for(int i =0;i<COLSIZE;i++)
@@ -140,14 +178,14 @@ int main()
         {
             for(int i = 0; i< NUMOFVAR; i++)
             {
-              wv[j][i]=ulazdec[indeks];
+              wv[j][i]=baza[indeks];
 			  indeks++;
 
             }
         }
 		for(int j = 0;j< NUMOFSLACK;j++)
 		{
-			wv[j][COLSIZE-1]=ulazdec[indeks];
+			wv[j][COLSIZE-1]=baza[indeks];
 			indeks++;
 		}
 	for(int j=0;j<ROWSIZE; j++)
