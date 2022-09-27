@@ -306,7 +306,7 @@ int main()
         pivotRow=loc;
 
         pivot=wv[pivotRow][pivotCol];
-		//wv[pivotRow][pivotCol]=1/wv[pivotRow][pivotCol]; za softverski implementiran hardver u drajveru
+		wv[pivotRow][pivotCol]=1/wv[pivotRow][pivotCol]; za softverski implementiran hardver u drajveru
 
         //printmat(wv);
         print("Sending to bram\n");
@@ -346,7 +346,7 @@ int main()
 
 		write_pivot(0);///
 		
-		while(!read_pivot());
+		while(!read_pivot(&ready,&start));
 
 		print("Pivot complete\n");
 

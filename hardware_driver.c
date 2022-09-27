@@ -45,7 +45,7 @@ static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t len
 //static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s);
 static int __init pivot_init(void);
 static void __exit pivot_exit(void);
-void do_pivoting();
+
 
 static struct cdev *my_cdev;
 static dev_t my_dev_id;
@@ -84,13 +84,13 @@ int p=0;
 static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off)
 {
 	char buf[BUFF_SIZE];
-	long int len=0;
+	//long int len=0;
 	//u32 counter_reg=0;
 	u32 bram_val=0;
 	
 	int minor = MINOR(f->f_inode->i_rdev);
 	
-	printk(KERN_INFO "i=%d,len=%ld,end_read=%d\n",i,len,end_read);
+	printk(KERN_INFO "p=%d,len=%ld,end_read=%d\n",p,len,end_read);
 	if(end_read==1)
 	{
 		end_read=0;
@@ -107,7 +107,7 @@ static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_
 		if(ready==1)
 			wake_up_interruptible(&readyQ);
 		len=scnprintf(buf,BUFF_SIZE,"Start=%d,Ready=%d\n",start,ready);
-		if(copy_to_user(buffer,buf,len)
+		if(copy_to_user(buffer,buf,len))
 		{
 			printk(KERN_ERR "Copy to user does not work\n");
 			return -EFAULT;
@@ -138,7 +138,7 @@ static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_
 			{
 			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 			}
-			*offset+=len;
+			*off+=len;
 			if(copy_to_user(buffer,buf,len))
 			{
 				printk(KERN_ERR "Copy to user does not work\n");
@@ -168,7 +168,7 @@ static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t len
 {
 	char buf[length+1];
 	int minor = MINOR(f->f_inode->i_rdev);
-	unsigned int pos=0,rbram_val=0,start_val=0;
+	unsigned int pos=0,bram_val=0,start_val=0;
 	if(copy_from_user(buf,buffer,length))
 		return -EFAULT;
 	buf[length]='\0';
@@ -191,12 +191,46 @@ static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t len
 			if(ready==1)
 			{
 				start=start_val;
-				do_pivoting();
+				///////////////
+				ready=0;
+	                       unsigned long long int newRow[COLSIZE];
+	                       unsigned int pivotColVal[ROWSIZE];
+	                         unsigned int pivot;
+	                       int pivotRow=0;
+	                     unsigned int pivotCol;
+	                    unsigned int temp1,temp2;
+	                    int i=0;
+	                      int j=0;
+	                    pivotRow=0;
+	                       pivotCol=bram[ROWSIZE*COLSIZE];
+	                       pivot=bram[pivotRow*COLSIZE+pivotCol];
+	                  for(i=0;i<COLSIZE;i++)
+	                 {
+		                 newRow[i] = bram[pivotRow*COLSIZE+i]/pivot;//kako float
+		                bram[pivotRow*COLSIZE+i]=newRow[i];
+	                           }
+	                for(j=1;j<ROWSIZE;j++)
+	                  {
+		         pivotColVal[j] = bram[j*COLSIZE+pivotCol];
+	                   }
+	                for(j=1;j<ROWSIZE-1;j=j+2)
+	                 {
+		        for(i=0;i<COLSIZE;i++)
+		         {
+			       temp1 = bram[j*COLSIZE+i]-newRow[i]*pivotColVal[j];
+			        bram[j*COLSIZE+i]=temp1;
+			        temp2 = bram[(j+1)*COLSIZE+i]-newRow[i]*pivotColVal[j+1];
+			       bram[(j+1)*COLSIZE+i]=temp2;
+		        }
+	                }
+	               ready=1;
+	               
+				//////////////
 				wake_up_interruptible(&readyQ);
 			}
 		}
 		else
-			start=start_val;
+		{	start=start_val;}
 		up(&sem_ip);
 		printk(KERN_INFO "Wrote succesfully to start register value %u\n",start_val);
 		break;
@@ -222,51 +256,16 @@ static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t len
 			up(&sem_bram);
 		}
 		else
-			up(&sem_ip);
+		{	up(&sem_ip);}
 		break;
 		default:
 		printk(KERN_ERR "Invalid minor\n");
 		
 	}
-	
-	
-}
+	return length;
+	}
+
 //////////////
-void do_pivoting()
-{
-	ready=0;
-	unsigned int newRow[COLSIZE];
-	unsigned int pivotColVal[ROWSIZE];
-	unsigned int pivot;
-	int pivotRow=0;
-	unsigned int pivotCol;
-	unsigned int temp1,temp2;
-	int i=0;
-	int j=0;
-	pivotRow=0;
-	pivotCol=bram[ROWSIZE*COLSIZE];
-	pivot=bram[pivotRow*COLSIZE+pivotCol];
-	for(i=0;i<COLSIZE;i++)
-	{
-		newRow[i] = bram[pivotRow*COLSIZE+i]/pivot;//kako float
-		bram[pivotRow*COLSIZE+i]=newRow[i];
-	}
-	for(j=1;j<ROWSIZE;j++)
-	{
-		pivotColVal[j] = bram[j*COLSIZE+pivotCol];
-	}
-	for(j=1;j<ROWSIZE-1;j=j+2)
-	{
-		for(i=0;i<COLSIZE;i++)
-		{
-			temp1 = bram[j*COLSIZE+i]-newRow[i]*pivotColVal[j];
-			bram[j*COLSIZE+i]=temp1;
-			temp2 = bram[(j+1)*COLSIZE+i]-newRow[i]*pivotColVal[j+1];
-			bram[(j+1)*COLSIZE+i]=temp2;
-		}
-	}
-	ready=1;
-}
 
 static int __init pivot_init(void)
 {
@@ -275,7 +274,7 @@ static int __init pivot_init(void)
 	
 	sema_init(&sem_bram,1);
 	sema_init(&sem_ip,1);
-	
+	int i =0;
 	for(i=0;i<ROWSIZE*COLSIZE+1;i++)//Initialize bram
 		bram[i]=0;
 		
