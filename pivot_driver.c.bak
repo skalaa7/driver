@@ -41,8 +41,8 @@ static int pivot_probe(struct platform_device *pdev);
 static int pivot_remove(struct platform_device *pdev);
 static int pivot_open(struct inode *i, struct file *f);
 static int pivot_close(struct inode *i, struct file *f);
-static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off);
-static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off);
+static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off);
+static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t length, loff_t *off);
 static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s);
 static int __init pivot_init(void);
 static void __exit pivot_exit(void);
@@ -374,15 +374,13 @@ static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length
 //////////////
 static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s)
 {
-	unsigned long len=vma->vm_end-vma->start;
-	int ret;
-	
-	ret=remap_pfn_range(vma,vma->vm_start,pfn,len,vma=>vm_page_prot);
-	if(ret<0)
-	{
-		printk(KERN_ERR "Could not map the address area\n");
-		erutn -EIO;
-	}
+	if (remap_pfn_range(vma, vma->vm_start, vm->vm_pgoff,
+						vma->vm_end - vma->vm_start,
+						vma->vm_page_prot))
+		return -EAGAIN;
+		vma->vm_ops = &simple_remap_vm_ops;
+		simple_vma_open(vma);
+		return 0;
 }
 
 static int __init pivot_init(void)

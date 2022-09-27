@@ -41,8 +41,8 @@ static int pivot_probe(struct platform_device *pdev);
 static int pivot_remove(struct platform_device *pdev);
 static int pivot_open(struct inode *i, struct file *f);
 static int pivot_close(struct inode *i, struct file *f);
-static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off);
-static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off);
+static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off);
+static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t length, loff_t *off);
 static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s);
 static int __init pivot_init(void);
 static void __exit pivot_exit(void);
@@ -222,9 +222,9 @@ static int pivot_close(struct inode *i, struct file *f)
 int p=0;
 int end_read=0;
  
-static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off)
+static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off)
 {
-	char buff[length+1];
+	char buf[BUFF_SIZE];
 	long int len=0;
 	u32 start_reg=0;
 	u32 ready_reg=0;
@@ -306,7 +306,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	return len;	
 }
 
-static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off)
+static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t length, loff_t *off)
 {
 	char buf[length+1];
 	int minor = MINOR(f->f_inode->i_rdev);

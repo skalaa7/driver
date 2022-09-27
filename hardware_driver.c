@@ -40,8 +40,8 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 static int pivot_open(struct inode *i, struct file *f);
 static int pivot_close(struct inode *i, struct file *f);
-static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off);
-static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off);
+static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off);
+static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t length, loff_t *off);
 //static ssize_t pivot_mmap(struct file *f, struct vm_area_struct *vma_s);
 static int __init pivot_init(void);
 static void __exit pivot_exit(void);
@@ -81,9 +81,9 @@ unsigned int bram[ROWSIZE*COLSIZE+1];
 int start=0,ready=1;
 int p=0;
  
-static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *off)
+static ssize_t pivot_read(struct file *f, char __user *buffer, size_t len, loff_t *off)
 {
-	char buff[length+1];
+	char buf[BUFF_SIZE];
 	long int len=0;
 	//u32 counter_reg=0;
 	u32 bram_val=0;
@@ -139,7 +139,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 			len=scnprintf(buf,BUFF_SIZE,"%u",bram_val);
 			}
 			*offset+=len;
-			if(copy_to_user(buffer,buff,len))
+			if(copy_to_user(buffer,buf,len))
 			{
 				printk(KERN_ERR "Copy to user does not work\n");
 				return -EFAULT;
@@ -164,7 +164,7 @@ static ssize_t pivot_read(struct file *f, char __user *buf, size_t len, loff_t *
 	return len;	
 }
 
-static ssize_t pivot_write(struct file *f, const char __user *buf, size_t length, loff_t *off)
+static ssize_t pivot_write(struct file *f, const char __user *buffer, size_t length, loff_t *off)
 {
 	char buf[length+1];
 	int minor = MINOR(f->f_inode->i_rdev);
